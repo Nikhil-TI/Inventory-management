@@ -29,11 +29,6 @@ The Product Management System is a Python-based application that allows users to
 2. **Set Up the Project**
     - Ensure you have Python 3.x installed on your machine. This project does not require any additional Python packages beyond the standard library.
 
-3. **Create data.json**
-    - Create a data.json file in the Storage directory with the following initial content:
-    ```bash
-    []
-    ```
 
 ## Usage
 

@@ -22,7 +22,7 @@ The Product Management System is a Python-based application that allows users to
 1. **Clone the Repository**
 
    ```bash
-   git https://github.com/Nikhil-TI/Inventory-management.git
+   git clone https://github.com/Nikhil-TI/Inventory-management.git
    cd Inventory-management
    ```
 

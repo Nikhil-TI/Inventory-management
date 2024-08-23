@@ -1,17 +1,4 @@
 import sqlite3
-
-sqliteConnection = sqlite3.connect('./Storage/storeManagementSystem.db')
-print("Database connected.")
-
-# Create the table if it doesn't exist
-sqliteConnection.execute("""CREATE TABLE IF NOT EXISTS inventoryStorage (
-    SKU VARCHAR(20) PRIMARY KEY,
-    name VARCHAR(20),
-    brand VARCHAR(20),
-    quantity INTEGER
-)""")
-sqliteConnection.commit()
-
 # Verify that the quantity is not negative
 def quantityValidator(quantity):
     if quantity < 0:

@@ -1,16 +1,26 @@
-import json
-#Path of our data stored in the json file
-filePath = "./Storage/data.json"
+import sqlite3
 
-#verify that the quantity is not negative
+sqliteConnection = sqlite3.connect('./Storage/storeManagementSystem.db')
+print("Database connected.")
+
+# Create the table if it doesn't exist
+sqliteConnection.execute("""CREATE TABLE IF NOT EXISTS inventoryStorage (
+    SKU VARCHAR(20) PRIMARY KEY,
+    name VARCHAR(20),
+    brand VARCHAR(20),
+    quantity INTEGER
+)""")
+sqliteConnection.commit()
+
+# Verify that the quantity is not negative
 def quantityValidator(quantity):
-    if(quantity < 0):
+    if quantity < 0:
         print("Quantity cannot be negative!")
         print("Returning to main menu.")
         return False
     return True
 
-#verify that the name is not null
+# Verify that the name is not null
 def nameValidator(name):
     if name == "":
         print("Name or Brand cannot be empty!")
@@ -18,172 +28,160 @@ def nameValidator(name):
         return False
     return True
 
+import sqlite3
+
 class Product:
-    #all product data obtained from the file
-    __allProducts = []
+    def __init__(self, db_connection):
+        self.db_connection = db_connection
+        self.loadProductsFromDB()
 
-    __productData = {
-        "SKU": None,
-        "name": None,
-        "brand": None,
-        "quantity": None
-    }
+    def loadProductsFromDB(self):
+        cursor = self.db_connection.cursor()
+        cursor.execute("SELECT * FROM inventoryStorage")
+        rows = cursor.fetchall()
+        self.__allProducts = []
+        for row in rows:
+            self.__allProducts.append({
+                "SKU": row[0],
+                "name": row[1],
+                "brand": row[2],
+                "quantity": row[3]
+            })
+        self.productCount = len(self.__allProducts)
 
-    #load all the products from the json file
-    def __init__(self):
-        dataFile = open(filePath)
-        data = json.load(dataFile)
-        self.__allProducts = data
+    def saveProductToDB(self, product):
+        cursor = self.db_connection.cursor()
+        cursor.execute("""INSERT INTO inventoryStorage (SKU, name, brand, quantity)
+                          VALUES (?, ?, ?, ?)""",
+                       (product["SKU"], product["name"], product["brand"], product["quantity"]))
+        self.db_connection.commit()
 
-    #save the current list of all products in the json file
-    def __saveProduct(self):
-        if(self.__productData["SKU"] != None):
-            self.__allProducts.append(self.__productData)
-        with open(filePath, 'w') as file:
-            json.dump(self.__allProducts, file)
-    
-    #display the products in the terminal
+    def updateProductInDB(self, SKU, updateData):
+        cursor = self.db_connection.cursor()
+        updateString = ", ".join([f"{key} = ?" for key in updateData.keys()])
+        query = f"UPDATE inventoryStorage SET {updateString} WHERE SKU = ?"
+        values = list(updateData.values()) + [SKU]
+        cursor.execute(query, values)
+        self.db_connection.commit()
+
+    def deleteProductFromDB(self, SKU):
+        cursor = self.db_connection.cursor()
+        cursor.execute("DELETE FROM inventoryStorage WHERE SKU = ?", (SKU,))
+        self.db_connection.commit()
+
     def viewProducts(self):
         print("View options")
         print("1. All products")
-        print("2. by product name")
-        print("3. by brand name")
-        print("4. by quantity")
+        print("2. By product name")
+        print("3. By brand name")
+        print("4. By quantity")
         selection = int(input())
-        match selection:
-            case 1:
-                for product in self.__allProducts:
+        if selection == 1:
+            for product in self.__allProducts:
+                print(product)
+        elif selection == 2:
+            name = input("Enter product name: ")
+            found = False
+            for product in self.__allProducts:
+                if product["name"] == name:
                     print(product)
-            case 2:
-                name = input("Enter product name: ")
-                flag = False
-                #check if the provided product name is valid or not
-                for product in self.__allProducts:
-                    if(product["name"] == name):
-                        print(product)
-                        flag = True
-                if flag == False:
-                    print("No product with name", name, " found")
-            case 3:
-                brand = input("Enter product brand: ")
-                flag = False
-                #check if the provided brand is valid or not
-                for product in self.__allProducts:
-                    if(product["brand"] == brand):
-                        print(product)
-                        flag = True
-                if flag == False:
-                    print("No product with brand", brand, " found")
-            case 4:
-                print("1. Ascending order")
-                print("2. Decending order")
-                option = int(input())
-                if(option == 1):
-                    #print the data in ascending order
-                    newlist = sorted(self.__allProducts, key=lambda d: d['quantity'])
-                    for product in newlist:
-                        print(product)
-                else:
-                    #print the data in descending order
-                    newlist = sorted(self.__allProducts, key=lambda d: d['quantity'], reverse=True)
-                    for product in newlist:
-                        print(product)
+                    found = True
+            if not found:
+                print("No product with name", name, "found")
+        elif selection == 3:
+            brand = input("Enter product brand: ")
+            found = False
+            for product in self.__allProducts:
+                if product["brand"] == brand:
+                    print(product)
+                    found = True
+            if not found:
+                print("No product with brand", brand, "found")
+        elif selection == 4:
+            print("1. Ascending order")
+            print("2. Descending order")
+            option = int(input())
+            sortedProducts = sorted(self.__allProducts, key=lambda d: d['quantity'], reverse=(option == 2))
+            for product in sortedProducts:
+                print(product)
+        else:
+            print("Invalid option")
 
-
-
-    #check the SKU is valid or not ie. it is unique
     def SKUValidator(self, SKU):
-        for product in self.__allProducts:
-            if product["SKU"] == SKU:
-                return False
-        return True
-    
-    #add the product to the object instance
+        return all(product["SKU"] != SKU for product in self.__allProducts)
+
     def addProduct(self):
         SKU = input("Enter the SKU: ")
-        self.__productData["SKU"] = SKU
-        #velidte the SKU
-        if self.SKUValidator(SKU) == False or SKU == "":
+        if not self.SKUValidator(SKU) or SKU == "":
             print("SKU must be unique!")
             print("Returning to main menu.")
             return
-        
+
         name = input("Enter the name of the product: ")
-        self.__productData["name"] = name
-        #check if provided name is not null
-        if nameValidator(name) == False:
+        if not nameValidator(name):
             return
-        
+
         brand = input("Enter the brand of the product: ")
-        self.__productData["brand"] = brand
-        #check if provided brand is not null
-        if nameValidator(brand) == False:
+        if not nameValidator(brand):
             return
-        
-        quantity = int(input("Enter the quatity of the product: "))
-        #verify that the quantuty is not negative
-        if quantityValidator(quantity) == False:
+
+        quantity = int(input("Enter the quantity of the product: "))
+        if not quantityValidator(quantity):
             return
-        self.__productData["quantity"] = quantity
-        self.__saveProduct()
-    
-    #check if the product exists or not
+
+        productData = {
+            "SKU": SKU,
+            "name": name,
+            "brand": brand,
+            "quantity": quantity
+        }
+        self.__allProducts.append(productData)
+        self.productCount += 1
+        self.saveProductToDB(productData)
+
     def checkIfProductExists(self, SKU):
-        for products in self.__allProducts:
-            if(products["SKU"] == SKU):
-                return True
-        return False
-    
-    #update the product data
+        return any(product["SKU"] == SKU for product in self.__allProducts)
+
     def updateProduct(self):
         SKU = input("Enter the SKU of the product: ")
-        #check if the product with the provided SKU exists or not
-        if(self.checkIfProductExists(SKU) == False):
+        if not self.checkIfProductExists(SKU):
             print("Product doesn't exist!")
             return
-        #find the produc twith the given SKU in AllProduct list
+
+        updateData = {}
         for product in self.__allProducts:
             if product["SKU"] == SKU:
-                #get the value that the user wants to update
-                print("what do you want to update?")
-                print("1. Name of the product")    
-                print("2. Brand of the product")    
+                print("What do you want to update?")
+                print("1. Name of the product")
+                print("2. Brand of the product")
                 print("3. Quantity of the product")
                 selection = int(input())
-                match selection:
-                    case 1:
-                        #update product name
-                        print("Current name:", product["name"])
-                        name = input("Enter the new name: ")
-                        product["name"] = name
-                    case 2:
-                        #update product brand
-                        print("Current brand:", product["brand"])
-                        brand = input("Enter the new brand: ")
-                        product["brand"] = brand
-                    case 3:
-                        #update the quantity oh the product
-                        print("Current name:", product["name"])
-                        quantity = input("Enter the new quantity: ")
-                        product["quantity"] = quantity
-                    case _:
-                        #invalid input handeling
-                        print("Invalid input!")
-                        print("You will will send back to main menu!")
+                if selection == 1:
+                    newName = input("Enter the new name: ")
+                    if nameValidator(newName):
+                        updateData["name"] = newName
+                elif selection == 2:
+                    newBrand = input("Enter the new brand: ")
+                    if nameValidator(newBrand):
+                        updateData["brand"] = newBrand
+                elif selection == 3:
+                    newQuantity = int(input("Enter the new quantity: "))
+                    if quantityValidator(newQuantity):
+                        updateData["quantity"] = newQuantity
+                else:
+                    print("Invalid input!")
+                    print("You will be sent back to the main menu!")
+                    return
+                self.updateProductInDB(SKU, updateData)
+                self.loadProductsFromDB()  # Reload products from DB after update
                 break
-        #save the data in the file
-        self.__saveProduct()
-    
-    #delete the product
+
     def deleteProduct(self):
         SKU = input("Enter the SKU of the product: ")
-        #validate SKU
-        if(self.checkIfProductExists(SKU) == False):
+        if not self.checkIfProductExists(SKU):
             print("Product doesn't exist!")
             return
-        #remove the item from the all priduct list
-        for product in self.__allProducts:
-            if product["SKU"] == SKU:
-                self.__allProducts.remove(product)
-        #save product to file
-        self.__saveProduct()
+
+        self.deleteProductFromDB(SKU)
+        self.__allProducts = [product for product in self.__allProducts if product["SKU"] != SKU]
+        self.productCount -= 1
